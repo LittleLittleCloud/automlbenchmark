@@ -43,32 +43,15 @@ def run(dataset: Dataset, config: TaskConfig):
     if is_save_artifacts:
         tmpdir = output_subdir('artifacts', config=config)
 
-    train_dataset_path: str
-    test_dataset_path: str
-    label: str = 'label'
     temp_output_folder = os.path.join(tmpdir, str(config.fold))
     log_path = os.path.join(temp_output_folder, 'log.txt')
-    label = dataset.target.index
+    label = dataset.target.name
 
-    if dataset.train.format == 'csv':
-        train_dataset_path = dataset.train.path
-        test_dataset_path = dataset.test.path
-    else:
-        # .arff
-        train_dataset_path = os.path.join(tmpdir, f'train.csv')
-        test_dataset_path = os.path.join(tmpdir, f'test.csv')
-        columns = [f'col_{i}' for i in range(dataset.train.data.shape[-1])]
-        columns[label] = 'label'
-
-        # might use a bit extra memory, but it's faster
-        pd.DataFrame(dataset.train.data, columns=columns).to_csv(train_dataset_path, index=None)
-        pd.DataFrame(dataset.test.data, columns=columns).to_csv(test_dataset_path, index=None)
-
-    log.info(f'train dataset: {train_dataset_path}')
-    log.info(f'test dataset: {test_dataset_path}')
+    log.info(f'train dataset: {dataset.train.path}')
+    log.info(f'test dataset: {dataset.test.path}')
     
     cmd =   f"{mlnet} {sub_command}"\
-            f" --dataset {train_dataset_path} --test-dataset {test_dataset_path} --train-time {train_time_in_seconds}"\
+            f" --dataset {dataset.train.path} --train-time {train_time_in_seconds}"\
             f" --label-col {label} --output {os.path.dirname(temp_output_folder)} --name {config.fold}"\
             f" --verbosity q --log-file-path {log_path}"
     
@@ -85,9 +68,9 @@ def run(dataset: Dataset, config: TaskConfig):
         model_path = mb_config['Artifact']['MLNetModelPath']
         output_prediction_txt = os.path.join(tmpdir, "prediction.txt")
         models_count = len(mb_config['RunHistory']['Trials'])
-        # predict
+        # predictli
         predict_cmd =   f"{mlnet} predict --task-type {config.type}" \
-                        f" --model {model_path} --dataset {test_dataset_path} > {output_prediction_txt}"
+                        f" --model {model_path} --dataset {dataset.test.path} --label-column {dataset.target.name} > {output_prediction_txt}"
         with Timer() as prediction:
             run_cmd(predict_cmd)
         if config.type == 'classification':
